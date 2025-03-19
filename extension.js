@@ -6,8 +6,7 @@ function activate(context) {
 	// Змінна для зберігання актуальної конфігурації
 	let currentConfig = vscode.workspace.getConfiguration('viteHtmlComponentCreator')
 	let defaultImports = currentConfig.get('defaultImports') || {
-		component_style_path: 'src/html/components/{component}/{component}.scss',
-		html_imports: [''],
+		html_imports: ["<link rel='stylesheet' href='@c/{component}/{component}.scss'/>"],
 		scss_imports: ["@import 'src/scss/imports';"]
 	}
 
@@ -15,8 +14,7 @@ function activate(context) {
 	const currentImports = currentConfig.inspect('defaultImports')
 	if (!currentImports.globalValue && !currentImports.workspaceValue) {
 		const defaultValue = {
-			component_style_path: 'src/html/components/{component}/{component}.scss',
-			html_imports: [''],
+			html_imports: ["<link rel='stylesheet' href='@c/{component}/{component}.scss'/>"],
 			scss_imports: ["@import 'src/scss/imports';"]
 		}
 
@@ -41,8 +39,7 @@ function activate(context) {
 		if (event.affectsConfiguration('viteHtmlComponentCreator.defaultImports')) {
 			currentConfig = vscode.workspace.getConfiguration('viteHtmlComponentCreator')
 			defaultImports = currentConfig.get('defaultImports') || {
-				component_style_path: 'src/html/components/{component}/{component}.scss',
-				html_imports: [''],
+				html_imports: ["<link rel='stylesheet' href='@c/{component}/{component}.scss'/>"],
 				scss_imports: ["@import 'src/scss/imports';"]
 			}
 			vscode.window.showInformationMessage('Налаштування defaultImports оновлено!')
@@ -82,14 +79,12 @@ function activate(context) {
 		// Перевірка коректності налаштувань
 		if (
 			!defaultImports ||
-			typeof defaultImports.component_style_path !== 'string' ||
 			!Array.isArray(defaultImports.html_imports) ||
 			!Array.isArray(defaultImports.scss_imports)
 		) {
 			vscode.window.showWarningMessage('Налаштування defaultImports мають некоректний формат. Використано значення за замовчуванням.')
 			defaultImports = {
-				component_style_path: 'src/html/components/{component}/{component}.scss',
-				html_imports: [''],
+				html_imports: ["<link rel='stylesheet' href='@c/{component}/{component}.scss'/>"],
 				scss_imports: ["@import 'src/scss/imports';"]
 			}
 		}
@@ -99,17 +94,16 @@ function activate(context) {
 				fs.mkdirSync(componentFolder, { recursive: true })
 			}
 
-			// Формування шляху до стилів із заміною {component}
-			const stylePath = defaultImports.component_style_path.replace(/{component}/g, componentName)
-
 			// Формування імпортів для HTML
-			const htmlImports = [
-				`<link rel="stylesheet" href="${stylePath}">`,
-				...defaultImports.html_imports.filter((imp) => imp.trim() !== '')
-			].join('\n')
+			const htmlImports = defaultImports.html_imports
+				.map((imp) => imp.replace(/{component}/g, componentName))
+				.filter((imp) => imp.trim() !== '')
+				.join('\n')
 
 			// Формування імпортів для SCSS
-			const scssImports = defaultImports.scss_imports.join('\n')
+			const scssImports = defaultImports.scss_imports
+				.filter((imp) => imp.trim() !== '')
+				.join('\n')
 
 			// Створення HTML-файлу
 			const htmlContent = `${htmlImports}\n\n<div class="${componentName}">\n  <!-- Ваш контент тут -->\n</div>`

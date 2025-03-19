@@ -48,16 +48,31 @@ MyComponent/
 
 ### settings.json  
 
+Ви можете налаштувати поведінку плагіна через settings.json у VSCode. Дефолтна конфігурація виглядає так:
+
 ```json
 {
   "viteHtmlComponentCreator.defaultImports": {
-    "component_style_path": "@c/{component}/{component}.scss",
-    "html_imports": [
-      ""
-    ],
-    "scss_imports": [
-      "@import '@s/connect';"
-    ]
+    "html_imports": ["<link rel='stylesheet' href='@c/{component}/{component}.scss'/>"],
+    "scss_imports": ["@import '@s/connect';"]
+  }
+}
+```
+
+html_imports: Масив із рядками для HTML-файлу. За замовчуванням містить <link> із динамічним шляхом до стилів, де {component} замінюється на назву компонента.
+scss_imports: Масив із імпортами для SCSS-файлу, наприклад, підключення зовнішніх стилів чи міксинів.
+Щоб змінити налаштування:
+
+Відкрийте settings.json (Ctrl + , → "Open Settings (JSON)").
+Додайте або змініть секцію viteHtmlComponentCreator.defaultImports.
+
+Приклад кастомізації:
+
+```json
+{
+  "viteHtmlComponentCreator.defaultImports": {
+    "html_imports": ["<link rel='stylesheet' href='@styles/{component}/{component}.scss'/>"],
+    "scss_imports": ["@import '@s/variables';", "@import '@s/mixins';"]
   }
 }
 ```
