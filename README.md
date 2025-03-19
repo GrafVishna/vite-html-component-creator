@@ -30,16 +30,34 @@ MyComponent/
 
 - **MyComponent.html**:
 ```html
-<link rel="stylesheet" href="./MyComponent.scss">
+<link rel="stylesheet" href="/src/html/components/MyComponent/MyComponent.scss">
 
 <div class="MyComponent">
- <!-- Ваш контент тут -->
+  <!-- Ваш контент тут -->
 </div>
 ```
 
 - **MyComponent.scss**:
 ```scss
+@import 'src/scss/mixins';
+
 .MyComponent {
   /* Ваші стилі тут */
+}
+```
+
+### settings.json  
+
+```json
+{
+  "viteHtmlComponentCreator.defaultImports": {
+    "component_style_path": "@c/{component}/{component}.scss",
+    "html_imports": [
+      ""
+    ],
+    "scss_imports": [
+      "@import '@s/connect';"
+    ]
+  }
 }
 ```

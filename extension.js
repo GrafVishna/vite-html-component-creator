@@ -3,6 +3,54 @@ const fs = require('fs')
 const path = require('path')
 
 function activate(context) {
+	// Змінна для зберігання актуальної конфігурації
+	let currentConfig = vscode.workspace.getConfiguration('viteHtmlComponentCreator')
+	let defaultImports = currentConfig.get('defaultImports') || {
+		component_style_path: 'src/html/components/{component}/{component}.scss',
+		html_imports: [''],
+		scss_imports: ["@import 'src/scss/imports';"]
+	}
+
+	// Ініціалізація налаштувань при першому запуску
+	const currentImports = currentConfig.inspect('defaultImports')
+	if (!currentImports.globalValue && !currentImports.workspaceValue) {
+		const defaultValue = {
+			component_style_path: 'src/html/components/{component}/{component}.scss',
+			html_imports: [''],
+			scss_imports: ["@import 'src/scss/imports';"]
+		}
+
+		vscode.window.showInformationMessage(
+			'Налаштування defaultImports не ініціалізовано. Ініціалізувати зараз?',
+			'Так',
+			'Ні'
+		).then((choice) => {
+			if (choice === 'Так') {
+				currentConfig.update('defaultImports', defaultValue, vscode.ConfigurationTarget.Global)
+					.then(() => {
+						vscode.window.showInformationMessage('Налаштування defaultImports успішно ініціалізовано!')
+					}, (error) => {
+						vscode.window.showErrorMessage('Помилка при ініціалізації налаштувань: ' + error.message)
+					})
+			}
+		})
+	}
+
+	// Підписка на зміни конфігурації
+	const configListener = vscode.workspace.onDidChangeConfiguration((event) => {
+		if (event.affectsConfiguration('viteHtmlComponentCreator.defaultImports')) {
+			currentConfig = vscode.workspace.getConfiguration('viteHtmlComponentCreator')
+			defaultImports = currentConfig.get('defaultImports') || {
+				component_style_path: 'src/html/components/{component}/{component}.scss',
+				html_imports: [''],
+				scss_imports: ["@import 'src/scss/imports';"]
+			}
+			vscode.window.showInformationMessage('Налаштування defaultImports оновлено!')
+		}
+	})
+	context.subscriptions.push(configListener)
+
+	// Реєстрація команди для створення компонента
 	let disposable = vscode.commands.registerCommand('vite-html-component-creator.createComponent', async (uri) => {
 		if (!uri || !uri.fsPath) {
 			vscode.window.showErrorMessage('Будь ласка, виберіть папку в провіднику.')
@@ -20,7 +68,7 @@ function activate(context) {
 					return 'Назва може містити лише літери, цифри та дефіс!'
 				}
 				return null
-			}
+			},
 		})
 
 		if (!componentName) {
@@ -31,14 +79,19 @@ function activate(context) {
 		const htmlFile = path.join(componentFolder, `${componentName}.html`)
 		const scssFile = path.join(componentFolder, `${componentName}.scss`)
 
-		// Отримання налаштувань
-		const config = vscode.workspace.getConfiguration('viteHtmlComponentCreator')
-		let defaultImports
-		try {
-			defaultImports = JSON.parse(config.get('defaultImports'))
-		} catch (error) {
-			vscode.window.showErrorMessage('Помилка в форматі JSON налаштувань: ' + error.message)
-			defaultImports = { html: [], scss: [] }
+		// Перевірка коректності налаштувань
+		if (
+			!defaultImports ||
+			typeof defaultImports.component_style_path !== 'string' ||
+			!Array.isArray(defaultImports.html_imports) ||
+			!Array.isArray(defaultImports.scss_imports)
+		) {
+			vscode.window.showWarningMessage('Налаштування defaultImports мають некоректний формат. Використано значення за замовчуванням.')
+			defaultImports = {
+				component_style_path: 'src/html/components/{component}/{component}.scss',
+				html_imports: [''],
+				scss_imports: ["@import 'src/scss/imports';"]
+			}
 		}
 
 		try {
@@ -46,14 +99,17 @@ function activate(context) {
 				fs.mkdirSync(componentFolder, { recursive: true })
 			}
 
+			// Формування шляху до стилів із заміною {component}
+			const stylePath = defaultImports.component_style_path.replace(/{component}/g, componentName)
+
 			// Формування імпортів для HTML
 			const htmlImports = [
-				...defaultImports.html,
-				`<link rel="stylesheet" href="./${componentName}.scss">`
+				`<link rel="stylesheet" href="${stylePath}">`,
+				...defaultImports.html_imports.filter((imp) => imp.trim() !== '')
 			].join('\n')
 
 			// Формування імпортів для SCSS
-			const scssImports = defaultImports.scss.join('\n')
+			const scssImports = defaultImports.scss_imports.join('\n')
 
 			// Створення HTML-файлу
 			const htmlContent = `${htmlImports}\n\n<div class="${componentName}">\n  <!-- Ваш контент тут -->\n</div>`
@@ -76,5 +132,5 @@ function deactivate() { }
 
 module.exports = {
 	activate,
-	deactivate
+	deactivate,
 }

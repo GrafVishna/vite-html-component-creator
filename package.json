@@ -2,7 +2,7 @@
   "name": "vite-html-component-creator",
   "displayName": "Vite HTML Component Creator",
   "description": "Швидке створення HTML компонентів для Vite: додає пункт у контекстне меню для генерації папки з HTML та SCSS файлами.",
-  "version": "1.0.1",
+  "version": "1.0.5",
   "publisher": "grafvishna",
   "repository": {
     "type": "git",
@@ -43,12 +43,43 @@
         }
       ]
     },
-    "properties": {
-      "viteHtmlComponentCreator.defaultImports": {
-        "type": "string",
-        "default": "{\n  \"html\": [],\n  \"scss\": []\n}",
-        "description": "JSON object specifying default imports for HTML and SCSS files",
-        "scope": "window"
+    "configuration": {
+      "title": "Vite HTML Component Creator",
+      "properties": {
+        "viteHtmlComponentCreator.defaultImports": {
+          "type": "object",
+          "default": {
+            "component_style_path": "src/html/components/{component}/{component}.scss",
+            "html_imports": [
+              ""
+            ],
+            "scss_imports": [
+              "@import 'src/scss/imports';"
+            ]
+          },
+          "description": "Налаштування імпортів для HTML та SCSS файлів компонентів",
+          "properties": {
+            "component_style_path": {
+              "type": "string",
+              "description": "Шлях до файлу стилів компонента. Використовуйте {component} як плейсхолдер для назви компонента."
+            },
+            "html_imports": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Додаткові імпорти для HTML-файлу (за замовчуванням порожній масив)"
+            },
+            "scss_imports": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Імпорти для SCSS-файлу (наприклад, міксини або змінні)"
+            }
+          },
+          "scope": "window"
+        }
       }
     }
   },
