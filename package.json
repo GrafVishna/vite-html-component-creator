@@ -1,0 +1,51 @@
+{
+  "name": "vite-html-component-creator",
+  "icon": "images/logo.png",
+  "displayName": "Vite HTML Component Creator",
+  "description": "Швидке створення HTML компонентів для Vite: додає пункт у контекстне меню для генерації папки з HTML та SCSS файлами.",
+  "version": "0.0.1",
+  "publisher": "grafvishna",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Snippets"
+  ],
+  "keywords": [
+    "vite",
+    "component",
+    "html",
+    "scss",
+    "productivity"
+  ],
+  "activationEvents": [
+    "onCommand:vite-html-component-creator.createComponent"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vite-html-component-creator.createComponent",
+        "title": "Створити компонент збірки"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "when": "resourceDirname",
+          "command": "vite-html-component-creator.createComponent",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "node ./test/runTest.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  }
+}
