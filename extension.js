@@ -4,13 +4,11 @@ const path = require('path')
 
 function activate(context) {
 	let disposable = vscode.commands.registerCommand('vite-html-component-creator.createComponent', async (uri) => {
-		// Перевірка, чи викликано з контекстного меню папки
 		if (!uri || !uri.fsPath) {
 			vscode.window.showErrorMessage('Будь ласка, виберіть папку в провіднику.')
 			return
 		}
 
-		// Показати поле для введення назви компонента
 		const componentName = await vscode.window.showInputBox({
 			prompt: 'Введіть назву компонента',
 			placeHolder: 'MyComponent',
@@ -26,26 +24,43 @@ function activate(context) {
 		})
 
 		if (!componentName) {
-			return // Користувач скасував введення
+			return
 		}
 
-		// Шлях до нової папки компонента
 		const componentFolder = path.join(uri.fsPath, componentName)
 		const htmlFile = path.join(componentFolder, `${componentName}.html`)
 		const scssFile = path.join(componentFolder, `${componentName}.scss`)
 
+		// Отримання налаштувань
+		const config = vscode.workspace.getConfiguration('viteHtmlComponentCreator')
+		let defaultImports
 		try {
-			// Створити папку компонента
+			defaultImports = JSON.parse(config.get('defaultImports'))
+		} catch (error) {
+			vscode.window.showErrorMessage('Помилка в форматі JSON налаштувань: ' + error.message)
+			defaultImports = { html: [], scss: [] }
+		}
+
+		try {
 			if (!fs.existsSync(componentFolder)) {
 				fs.mkdirSync(componentFolder, { recursive: true })
 			}
 
-			// Створити HTML-файл із підключенням SCSS
-			const htmlContent = `<link rel="stylesheet" href="./${componentName}.scss">\n\n<div class="${componentName}">\n  <!-- Ваш контент тут -->\n</div>`
+			// Формування імпортів для HTML
+			const htmlImports = [
+				...defaultImports.html,
+				`<link rel="stylesheet" href="./${componentName}.scss">`
+			].join('\n')
+
+			// Формування імпортів для SCSS
+			const scssImports = defaultImports.scss.join('\n')
+
+			// Створення HTML-файлу
+			const htmlContent = `${htmlImports}\n\n<div class="${componentName}">\n  <!-- Ваш контент тут -->\n</div>`
 			fs.writeFileSync(htmlFile, htmlContent)
 
-			// Створити SCSS-файл
-			const scssContent = `.${componentName} {\n  /* Стилі компонента */\n}\n`
+			// Створення SCSS-файлу
+			const scssContent = `${scssImports}${scssImports ? '\n' : ''}.${componentName} {\n  /* Стилі компонента */\n}\n`
 			fs.writeFileSync(scssFile, scssContent)
 
 			vscode.window.showInformationMessage(`Компонент "${componentName}" успішно створено!`)
