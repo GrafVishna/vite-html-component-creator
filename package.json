@@ -2,7 +2,7 @@
   "name": "vite-html-component-creator",
   "displayName": "Vite HTML Component Creator",
   "description": "Швидке створення HTML компонентів для Vite: додає пункт у контекстне меню для генерації папки з HTML та SCSS файлами.",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "publisher": "grafvishna",
   "icon": "logo.png",
   "repository": {

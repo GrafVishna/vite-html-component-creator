@@ -1,117 +1,140 @@
 const vscode = require('vscode')
-const fs = require('fs')
+const fs = require('fs').promises
 const path = require('path')
 
-function activate(context) {
-	// Змінна для зберігання актуальної конфігурації
-	let currentConfig = vscode.workspace.getConfiguration('viteHtmlComponentCreator')
-	let defaultImports = currentConfig.get('defaultImports') || {
-		html_imports: ["<link rel='stylesheet' href='@c/{component}/{component}.scss'/>"],
-		scss_imports: ["@import 'src/scss/imports';"]
-	}
-
-	// Ініціалізація налаштувань при першому запуску
+// Ініціалізація конфігурації
+async function initializeConfig(currentConfig) {
 	const currentImports = currentConfig.inspect('defaultImports')
 	if (!currentImports.globalValue && !currentImports.workspaceValue) {
-		const defaultValue = {
-			html_imports: ["<link rel='stylesheet' href='@c/{component}/{component}.scss'/>"],
-			scss_imports: ["@import 'src/scss/imports';"]
-		}
-
-		vscode.window.showInformationMessage(
+		const defaultValue = { html_imports: [], scss_imports: [] }
+		const choice = await vscode.window.showInformationMessage(
 			'Налаштування defaultImports не ініціалізовано. Ініціалізувати зараз?',
 			'Так',
 			'Ні'
-		).then((choice) => {
-			if (choice === 'Так') {
-				currentConfig.update('defaultImports', defaultValue, vscode.ConfigurationTarget.Global)
-					.then(() => {
-						vscode.window.showInformationMessage('Налаштування defaultImports успішно ініціалізовано!')
-					}, (error) => {
-						vscode.window.showErrorMessage('Помилка при ініціалізації налаштувань: ' + error.message)
-					})
-			}
-		})
+		)
+		if (choice === 'Так') {
+			await currentConfig.update('defaultImports', defaultValue, vscode.ConfigurationTarget.Global)
+				.then(() => {
+					vscode.window.showInformationMessage('Налаштування defaultImports успішно ініціалізовано!')
+				}, (error) => {
+					vscode.window.showErrorMessage(`Помилка при ініціалізації налаштувань: ${error.toString()}`)
+				})
+		}
 	}
+}
 
-	// Підписка на зміни конфігурації
+// Оновлення конфігурації при зміні
+function setupConfigListener(context, updateConfigCallback) {
 	const configListener = vscode.workspace.onDidChangeConfiguration((event) => {
 		if (event.affectsConfiguration('viteHtmlComponentCreator.defaultImports')) {
-			currentConfig = vscode.workspace.getConfiguration('viteHtmlComponentCreator')
-			defaultImports = currentConfig.get('defaultImports') || {
-				html_imports: ["<link rel='stylesheet' href='@c/{component}/{component}.scss'/>"],
-				scss_imports: ["@import 'src/scss/imports';"]
-			}
+			updateConfigCallback()
 			vscode.window.showInformationMessage('Налаштування defaultImports оновлено!')
 		}
 	})
 	context.subscriptions.push(configListener)
+}
 
-	// Реєстрація команди для створення компонента
+// Отримання назви компонента
+async function getComponentName() {
+	const componentName = await vscode.window.showInputBox({
+		prompt: 'Введіть назву компонента',
+		placeHolder: 'MyComponent',
+		validateInput: (value) => {
+			if (!value || value.trim() === '') return 'Назва компонента не може бути порожньою!'
+			if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(value)) {
+				return 'Назва може містити лише літери, цифри та дефіс, і не починатися з дефіса!'
+			}
+			return null
+		},
+	})
+	if (!componentName) {
+		vscode.window.showInformationMessage('Створення компонента скасовано.')
+		return null
+	}
+	return componentName
+}
+
+// Перевірка та створення папки компонента
+async function ensureComponentFolder(componentFolder, componentName) {
+	if (await fs.stat(componentFolder).catch(() => false)) {
+		const overwrite = await vscode.window.showWarningMessage(
+			`Папка "${componentName}" уже існує! Відхилено!`,
+			'Зрозуміло'
+		)
+		if (overwrite === 'Зрозуміло') {
+			vscode.window.showInformationMessage('Створення компонента скасовано.')
+			return false
+		}
+	} else {
+		await fs.mkdir(componentFolder, { recursive: true })
+	}
+	return true
+}
+
+// Генерація вмісту файлів
+function generateFileContents(componentName, defaultImports) {
+	const htmlImports = defaultImports.html_imports
+		.map((imp) => imp.replace(/{component}/g, componentName))
+		.filter(Boolean)
+		.join('\n')
+
+	const scssImports = defaultImports.scss_imports
+		.filter(Boolean)
+		.join('\n')
+
+	const htmlCmntImp = htmlImports ? '<!-- ====== Imports ====== -->\n' : ''
+	const htmlCmntComp = '<!-- ====== Component ====== -->\n'
+	const scssCmntImp = scssImports ? '// ====== Imports ======\n' : ''
+	const scssCmntComp = '// ====== Component ======\n'
+
+	const htmlContent = `${htmlCmntImp}${htmlImports}${htmlImports ? '\n\n' : '\n'}${htmlCmntComp}<div class="${componentName}">\n  <!-- Ваш контент тут -->\n</div>`
+	const scssContent = `${scssCmntImp}${scssImports}${scssImports ? '\n\n' : ''}${scssCmntComp}.${componentName} {\n  /* Стилі компонента */\n}`
+
+	return { htmlContent, scssContent }
+}
+
+// Створення файлів компонента
+async function createComponentFiles(componentFolder, componentName, htmlContent, scssContent) {
+	const htmlFile = path.join(componentFolder, `${componentName}.html`)
+	const scssFile = path.join(componentFolder, `${componentName}.scss`)
+	await Promise.all([
+		fs.writeFile(htmlFile, htmlContent),
+		fs.writeFile(scssFile, scssContent)
+	])
+}
+
+async function activate(context) {
+	let currentConfig = vscode.workspace.getConfiguration('viteHtmlComponentCreator')
+	let defaultImports = currentConfig.get('defaultImports') || { html_imports: [], scss_imports: [] }
+
+	await initializeConfig(currentConfig)
+
+	setupConfigListener(context, () => {
+		currentConfig = vscode.workspace.getConfiguration('viteHtmlComponentCreator')
+		defaultImports = currentConfig.get('defaultImports') || { html_imports: [], scss_imports: [] }
+	})
+
 	let disposable = vscode.commands.registerCommand('vite-html-component-creator.createComponent', async (uri) => {
 		if (!uri || !uri.fsPath) {
 			vscode.window.showErrorMessage('Будь ласка, виберіть папку в провіднику.')
 			return
 		}
 
-		const componentName = await vscode.window.showInputBox({
-			prompt: 'Введіть назву компонента',
-			placeHolder: 'MyComponent',
-			validateInput: (value) => {
-				if (!value || value.trim() === '') {
-					return 'Назва компонента не може бути порожньою!'
-				}
-				if (!/^[a-zA-Z0-9-]+$/.test(value)) {
-					return 'Назва може містити лише літери, цифри та дефіс!'
-				}
-				return null
-			},
-		})
-
-		if (!componentName) {
-			return
-		}
+		const componentName = await getComponentName()
+		if (!componentName) return
 
 		const componentFolder = path.join(uri.fsPath, componentName)
-		const htmlFile = path.join(componentFolder, `${componentName}.html`)
-		const scssFile = path.join(componentFolder, `${componentName}.scss`)
 
-		// Перевірка коректності налаштувань
-		if (
-			!defaultImports ||
-			!Array.isArray(defaultImports.html_imports) ||
-			!Array.isArray(defaultImports.scss_imports)
-		) {
+		if (!defaultImports || !Array.isArray(defaultImports.html_imports) || !Array.isArray(defaultImports.scss_imports)) {
 			vscode.window.showWarningMessage('Налаштування defaultImports мають некоректний формат. Використано значення за замовчуванням.')
-			defaultImports = {
-				html_imports: ["<link rel='stylesheet' href='@c/{component}/{component}.scss'/>"],
-				scss_imports: ["@import 'src/scss/imports';"]
-			}
+			defaultImports = { html_imports: [], scss_imports: [] }
 		}
 
 		try {
-			if (!fs.existsSync(componentFolder)) {
-				fs.mkdirSync(componentFolder, { recursive: true })
-			}
+			if (!(await ensureComponentFolder(componentFolder, componentName))) return
 
-			// Формування імпортів для HTML
-			const htmlImports = defaultImports.html_imports
-				.map((imp) => imp.replace(/{component}/g, componentName))
-				.filter((imp) => imp.trim() !== '')
-				.join('\n')
-
-			// Формування імпортів для SCSS
-			const scssImports = defaultImports.scss_imports
-				.filter((imp) => imp.trim() !== '')
-				.join('\n')
-
-			// Створення HTML-файлу
-			const htmlContent = `${htmlImports}\n\n<div class="${componentName}">\n  <!-- Ваш контент тут -->\n</div>`
-			fs.writeFileSync(htmlFile, htmlContent)
-
-			// Створення SCSS-файлу
-			const scssContent = `${scssImports}${scssImports ? '\n' : ''}.${componentName} {\n  /* Стилі компонента */\n}\n`
-			fs.writeFileSync(scssFile, scssContent)
+			const { htmlContent, scssContent } = generateFileContents(componentName, defaultImports)
+			await createComponentFiles(componentFolder, componentName, htmlContent, scssContent)
 
 			vscode.window.showInformationMessage(`Компонент "${componentName}" успішно створено!`)
 		} catch (error) {
